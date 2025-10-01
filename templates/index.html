@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Анализ отзывов отелей с помощью Embeddings</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        
+        .hotel-selector {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+        
+        .hotel-selector h2 {
+            margin-bottom: 15px;
+            color: #333;
+            font-size: 20px;
+        }
+        
+        .hotel-buttons {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .hotel-btn {
+            flex: 1;
+            min-width: 200px;
+            padding: 15px 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .hotel-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .hotel-btn:active {
+            transform: translateY(0);
+        }
+        
+        .custom-review-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+        
+        .custom-review-section h2 {
+            margin-bottom: 15px;
+            color: #333;
+            font-size: 20px;
+        }
+        
+        .custom-review-form {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        .custom-review-form select,
+        .custom-review-form textarea {
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: inherit;
+        }
+        
+        .custom-review-form textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+        
+        .analyze-btn {
+            padding: 12px 30px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+        
+        .analyze-btn:hover {
+            background: #218838;
+        }
+        
+        .results {
+            display: none;
+        }
+        
+        .results.show {
+            display: block;
+        }
+        
+        .hotel-info {
+            padding: 20px;
+            background: #e3f2fd;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .hotel-info h2 {
+            color: #1976d2;
+            margin-bottom: 10px;
+        }
+        
+        .hotel-info p {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        
+        .features {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        
+        .feature-tag {
+            padding: 5px 12px;
+            background: #1976d2;
+            color: white;
+            border-radius: 15px;
+            font-size: 12px;
+        }
+        
+        .reviews-section {
+            margin-bottom: 20px;
+        }
+        
+        .reviews-section h3 {
+            color: #333;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #ddd;
+        }
+        
+        .review-card {
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 8px;
+            background: white;
+            border: 2px solid #ddd;
+        }
+        
+        .review-card.normal {
+            border-color: #28a745;
+            background: #f1f8f4;
+        }
+        
+        .review-card.anomaly {
+            border-color: #dc3545;
+            background: #fcf1f2;
+        }
+        
+        .review-card.needs-check {
+            border-color: #ffc107;
+            background: #fff9e6;
+        }
+        
+        .review-text {
+            color: #333;
+            margin-bottom: 10px;
+            line-height: 1.6;
+        }
+        
+        .review-metrics {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 14px;
+        }
+        
+        .similarity-score {
+            font-weight: 600;
+            color: #666;
+        }
+        
+        .status-badge {
+            padding: 5px 12px;
+            border-radius: 15px;
+            font-weight: 600;
+            font-size: 12px;
+        }
+        
+        .status-badge.ok {
+            background: #28a745;
+            color: white;
+        }
+        
+        .status-badge.warning {
+            background: #ffc107;
+            color: #333;
+        }
+        
+        .status-badge.error {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            font-size: 18px;
+            color: #666;
+        }
+        
+        .error {
+            padding: 20px;
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            border-radius: 8px;
+            color: #721c24;
+            margin-bottom: 20px;
+        }
+        
+        .info-box {
+            padding: 15px;
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            border-radius: 8px;
+            color: #0c5460;
+            margin-bottom: 20px;
+        }
+        
+        .threshold-info {
+            font-size: 14px;
+            color: #666;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏨 Анализ отзывов отелей с помощью Embeddings</h1>
+        <p class="subtitle">Система автоматического определения несоответствий между отзывами и параметрами отелей</p>
+        
+        <div class="info-box">
+            <strong>Как это работает:</strong>
+            <ul style="margin-left: 20px; margin-top: 5px;">
+                <li>Система получает эмбеддинги (векторные представления) для описания отеля и всех отзывов</li>
+                <li>Сравнивает векторы отзывов с вектором описания отеля через косинусное сходство</li>
+                <li>Если сходство ниже порога ({{ '%.2f' | format(0.75) }}), отзыв помечается для проверки секретным гостем</li>
+            </ul>
+        </div>
+        
+        <div class="hotel-selector">
+            <h2>Выберите отель для анализа:</h2>
+            <div class="hotel-buttons">
+                {% for hotel_id, hotel in hotels.items() %}
+                <button class="hotel-btn" onclick="analyzeHotel('{{ hotel_id }}')">
+                    {{ hotel.name }}
+                </button>
+                {% endfor %}
+            </div>
+        </div>
+        
+        <div class="custom-review-section">
+            <h2>Проверить свой отзыв:</h2>
+            <form class="custom-review-form" onsubmit="analyzeCustomReview(event)">
+                <select id="customHotelSelect" required>
+                    <option value="">Выберите отель...</option>
+                    {% for hotel_id, hotel in hotels.items() %}
+                    <option value="{{ hotel_id }}">{{ hotel.name }}</option>
+                    {% endfor %}
+                </select>
+                <textarea id="customReviewText" placeholder="Введите текст отзыва..." required></textarea>
+                <button type="submit" class="analyze-btn">Проанализировать отзыв</button>
+            </form>
+        </div>
+        
+        <div id="results" class="results"></div>
+    </div>
+    
+    <script>
+        async function analyzeHotel(hotelId) {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<div class="loading">⏳ Анализируем отзывы...</div>';
+            resultsDiv.classList.add('show');
+            
+            try {
+                const response = await fetch(`/api/analyze/${hotelId}`);
+                if (!response.ok) {
+                    throw new Error('Ошибка при анализе');
+                }
+                
+                const data = await response.json();
+                displayResults(data);
+            } catch (error) {
+                resultsDiv.innerHTML = `<div class="error">❌ Ошибка: ${error.message}</div>`;
+            }
+        }
+        
+        async function analyzeCustomReview(event) {
+            event.preventDefault();
+            
+            const hotelId = document.getElementById('customHotelSelect').value;
+            const reviewText = document.getElementById('customReviewText').value;
+            
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<div class="loading">⏳ Анализируем ваш отзыв...</div>';
+            resultsDiv.classList.add('show');
+            
+            try {
+                const response = await fetch('/api/custom_review', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        hotel_id: hotelId,
+                        review_text: reviewText
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Ошибка при анализе');
+                }
+                
+                const data = await response.json();
+                displayCustomReviewResult(data);
+            } catch (error) {
+                resultsDiv.innerHTML = `<div class="error">❌ Ошибка: ${error.message}</div>`;
+            }
+        }
+        
+        function displayResults(data) {
+            const resultsDiv = document.getElementById('results');
+            
+            let html = `
+                <div class="hotel-info">
+                    <h2>${data.hotel.name}</h2>
+                    <p>${data.hotel.description}</p>
+                    <div class="features">
+                        ${data.hotel.features.map(f => `<span class="feature-tag">${f}</span>`).join('')}
+                    </div>
+                    <p class="threshold-info">📊 Порог сходства: ${(data.threshold * 100).toFixed(0)}%</p>
+                </div>
+            `;
+            
+            // Normal reviews
+            if (data.normal_reviews.length > 0) {
+                html += '<div class="reviews-section">';
+                html += '<h3>✅ Обычные отзывы (соответствуют описанию отеля):</h3>';
+                
+                data.normal_reviews.forEach(review => {
+                    const similarity = (review.similarity * 100).toFixed(1);
+                    const statusClass = review.needs_check ? 'needs-check' : 'normal';
+                    const statusBadge = review.needs_check ? 
+                        '<span class="status-badge warning">⚠️ Требуется проверка</span>' :
+                        '<span class="status-badge ok">✓ Соответствует</span>';
+                    
+                    html += `
+                        <div class="review-card ${statusClass}">
+                            <div class="review-text">${review.review}</div>
+                            <div class="review-metrics">
+                                <span class="similarity-score">Сходство: ${similarity}%</span>
+                                ${statusBadge}
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                html += '</div>';
+            }
+            
+            // Anomalous reviews
+            if (data.anomalous_reviews.length > 0) {
+                html += '<div class="reviews-section">';
+                html += '<h3>🚨 Подозрительные отзывы (НЕ соответствуют описанию отеля):</h3>';
+                
+                data.anomalous_reviews.forEach(review => {
+                    const similarity = (review.similarity * 100).toFixed(1);
+                    const statusClass = 'anomaly';
+                    const statusBadge = '<span class="status-badge error">⚠️ ТРЕБУЕТСЯ ПРОВЕРКА СЕКРЕТНЫМ ГОСТЕМ</span>';
+                    
+                    html += `
+                        <div class="review-card ${statusClass}">
+                            <div class="review-text">${review.review}</div>
+                            <div class="review-metrics">
+                                <span class="similarity-score">Сходство: ${similarity}%</span>
+                                ${statusBadge}
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                html += '</div>';
+            }
+            
+            resultsDiv.innerHTML = html;
+        }
+        
+        function displayCustomReviewResult(data) {
+            const resultsDiv = document.getElementById('results');
+            const similarity = (data.similarity * 100).toFixed(1);
+            
+            let statusClass, statusBadge, statusTitle;
+            if (data.needs_check) {
+                statusClass = 'anomaly';
+                statusBadge = '<span class="status-badge error">⚠️ ТРЕБУЕТСЯ ПРОВЕРКА СЕКРЕТНЫМ ГОСТЕМ</span>';
+                statusTitle = '🚨 Отзыв НЕ соответствует описанию отеля';
+            } else {
+                statusClass = 'normal';
+                statusBadge = '<span class="status-badge ok">✓ Соответствует</span>';
+                statusTitle = '✅ Отзыв соответствует описанию отеля';
+            }
+            
+            const html = `
+                <div class="hotel-info">
+                    <h2>${data.hotel.name}</h2>
+                    <p>${data.hotel.description}</p>
+                    <div class="features">
+                        ${data.hotel.features.map(f => `<span class="feature-tag">${f}</span>`).join('')}
+                    </div>
+                    <p class="threshold-info">📊 Порог сходства: ${(data.threshold * 100).toFixed(0)}%</p>
+                </div>
+                
+                <div class="reviews-section">
+                    <h3>${statusTitle}</h3>
+                    <div class="review-card ${statusClass}">
+                        <div class="review-text">${data.review}</div>
+                        <div class="review-metrics">
+                            <span class="similarity-score">Сходство: ${similarity}%</span>
+                            ${statusBadge}
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            resultsDiv.innerHTML = html;
+        }
+    </script>
+</body>
+</html>
